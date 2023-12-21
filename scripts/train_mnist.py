@@ -6,7 +6,7 @@ sys.path.append(os.getcwd())
 import data
 import torch
 from omegaconf import OmegaConf
-from pytorch_lightning import Trainer, loggers, callbacks
+from pytorch_lightning import Trainer, loggers, callbacks, seed_everything
 
 from core import net
 
@@ -16,6 +16,8 @@ def main(flag, checkpoint=None):
     config = OmegaConf.load(
         open("scripts/config.yaml", "r")
     )
+
+    seed_everything(config.seed, True)
 
     dm = data.MinistLDM(
         config.dataset.val_ratio,
@@ -29,11 +31,17 @@ def main(flag, checkpoint=None):
     trainer = Trainer(
         max_epochs=config.optim.max_epochs,
         accelerator="gpu",
-        logger=loggers.CSVLogger(
-            "./logs",
-            name="mnist",
-            flush_logs_every_n_steps=500
-        ),
+        logger=[
+            loggers.CSVLogger(
+                "./logs/csv",
+                name="mnist",
+                flush_logs_every_n_steps=500
+            ),
+            loggers.TensorBoardLogger(
+                "./logs/tb",
+                name="mnist",
+            )
+        ],
         precision="32",
         enable_checkpointing=True,
         callbacks=[
@@ -45,7 +53,8 @@ def main(flag, checkpoint=None):
                 monitor="val_loss",
                 patience=10,
             )
-        ]
+        ],
+        deterministic="warn"
     )
     
     if flag == "train":
